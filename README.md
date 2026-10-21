@@ -1,5 +1,7 @@
 # Pake GUI für Windows
 
+[![Release](https://github.com/jahdaganj04ki-a11y/PakeGUIWin/actions/workflows/release.yml/badge.svg)](https://github.com/jahdaganj04ki-a11y/PakeGUIWin/releases/latest)
+
 Native Windows-Oberfläche (C# / WinForms, .NET 10) für den Pake-Online-Workflow
 [`pake-cli.yaml`](https://github.com/jahdaganj04ki-a11y/PakeGUIWin/blob/main/.github/workflows/pake-cli.yaml)
 aus [tw93/Pake](https://github.com/tw93/Pake).
@@ -155,6 +157,8 @@ dotnet publish src/PakeGuiWin/PakeGuiWin.csproj -c Release -r win-x64 -o dist/wi
 ### Projektstruktur
 
 ```
+.github/workflows/
+  release.yml              Tag/Manuell -> baut EXE und legt GitHub-Release an
 src/PakeGui.Core/          Logik ohne UI (plattformunabhängig, testbar)
   PakeSettings.cs          alle Einstellungen inkl. Workflow-Eingaben
   PakeArgumentBuilder.cs   Einstellungen -> pake-Argumente (+ Hinweise)
@@ -171,7 +175,41 @@ tools/make-icon.py         erzeugt assets/app.ico
 
 ---
 
-## 7. Qualitätssicherung
+## 7. Releases auf GitHub
+
+Die Builds landen automatisch in den [Releases](https://github.com/jahdaganj04ki-a11y/PakeGUIWin/releases) –
+gesteuert von [`.github/workflows/release.yml`](.github/workflows/release.yml).
+
+**Variante A – Tag pushen** (üblich):
+
+```bash
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+**Variante B – manuell** (Actions → *Release* → *Run workflow*):
+Version ohne `v` eingeben (z. B. `1.2.0`), optional „Als Pre-Release veröffentlichen“ ankreuzen.
+Der Tag `v1.2.0` wird dabei automatisch am aktuellen Commit angelegt.
+
+Der Workflow erledigt:
+
+1. .NET 10 SDK einrichten, **46 Tests** ausführen (bricht bei Fehlern ab).
+2. Version aus Tag bzw. Eingabe ableiten, als `Version`/`FileVersion` in die EXE schreiben.
+3. `PakeGUIWin.exe` self-contained für `win-x64` bauen.
+4. `PakeGUIWin-win-x64.zip` und `SHA256SUMS.txt` erzeugen (ZIP enthält die EXE direkt im Wurzelverzeichnis).
+5. Release `v<Version>` anlegen bzw. aktualisieren und beide Dateien anhängen; zusätzlich
+   eine Job-Zusammenfassung mit Größe und SHA256.
+
+Vorab-Versionen wie `v2.0.0-beta.1` werden automatisch als **Pre-Release** markiert
+(die Windows-Dateiversion wird dabei auf `2.0.0.0` normalisiert).
+Ein erneuter Lauf mit derselben Version aktualisiert das vorhandene Release und ersetzt die Assets.
+
+Der Dateiname bleibt stabil (`PakeGUIWin-win-x64.zip`), damit
+`releases/latest/download/PakeGUIWin-win-x64.zip` dauerhaft funktioniert.
+
+---
+
+## 8. Qualitätssicherung
 
 Automatisiert geprüft (in dieser Umgebung ausgeführt):
 
@@ -183,6 +221,11 @@ Automatisiert geprüft (in dieser Umgebung ausgeführt):
   `EnvironmentError` (Exitcode 4), weil im Testsystem kein Rust installiert ist.
 * **PE-Prüfung der EXE**: `PE32+`, Subsystem `GUI`, x86-64, Icon-Gruppe mit 7 Größen,
   Versionsressource (`Pake GUI`, 1.0.0), Manifest vorhanden.
+* **Release-Workflow**: `actionlint` ohne Befund; die PowerShell-Schritte (Version ableiten,
+  ZIP und SHA256 erzeugen) wurden lokal mit PowerShell 7 ausgeführt – inklusive Tag-, Dispatch-,
+  Pre-Release- und Fehlerfall – und die Prüfsumme mit `sha256sum -c` gegengeprüft.
+  Der Publish-Aufruf mit `-p:Version`/`-p:FileVersion` erzeugt nachweislich eine EXE mit
+  den erwarteten Versionsressourcen. Der Workflow selbst kann nur auf GitHub-Runnern laufen.
 
 **Nicht geprüft:** Die Oberfläche selbst konnte hier nicht gestartet werden – die
 Build-Umgebung ist Linux, und WinForms läuft ausschließlich unter Windows (kein Wine
@@ -191,7 +234,7 @@ Windows-Rechner gegengeprüft werden; die Logik dahinter ist durch die Tests abg
 
 ---
 
-## 8. Rechtliches
+## 9. Rechtliches
 
 Dieses Programm ist eine inoffizielle Oberfläche und kein Bestandteil von Pake.
 [Pake](https://github.com/tw93/Pake) steht unter **GPL-3.0**; mit Pake erzeugte Apps

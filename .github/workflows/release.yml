@@ -1,0 +1,152 @@
+name: Release
+
+# Baut die Pake GUI als Windows-EXE und legt sie als Release-Asset ab.
+# Auslöser: Tag v1.2.3 pushen ODER manuell starten (dann wird der Tag angelegt).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version ohne führendes v (z. B. 1.0.0). Der Tag v<Version> wird angelegt."
+        required: true
+        default: "1.0.0"
+        type: string
+      prerelease:
+        description: "Als Pre-Release veröffentlichen"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+jobs:
+  release:
+    name: Windows-EXE bauen und veröffentlichen
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v6
+
+      - name: .NET SDK einrichten
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Version bestimmen
+        id: version
+        shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $raw = if ($env:EVENT_NAME -eq 'workflow_dispatch') { $env:INPUT_VERSION } else { $env:REF_NAME }
+          $version = ($raw.Trim() -replace '^[vV]', '')
+
+          if ($version -notmatch '^\d+\.\d+\.\d+([-+][0-9A-Za-z.\-+]+)?$') {
+            throw "Ungültige Version '$raw'. Erwartet wird z. B. v1.0.0 oder 1.0.0."
+          }
+
+          # Windows-Dateiversion braucht vier Zahlen und keine Vorab-Kennung.
+          $numeric = ($version -split '[-+]')[0]
+          $parts = @($numeric.Split('.'))
+          while ($parts.Count -lt 4) { $parts += '0' }
+          $fileVersion = ($parts[0..3] -join '.')
+
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "fileversion=$fileVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Version: $version (Dateiversion $fileVersion)"
+
+      - name: Tests ausführen
+        run: dotnet test tests/PakeGui.Core.Tests/PakeGui.Core.Tests.csproj -c Release --nologo
+
+      - name: Windows-EXE bauen
+        run: >
+          dotnet publish src/PakeGuiWin/PakeGuiWin.csproj
+          -c Release
+          -r win-x64
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:FileVersion=${{ steps.version.outputs.fileversion }}
+          -o dist/win-x64
+          --nologo
+
+      - name: ZIP und Prüfsummen erzeugen
+        shell: pwsh
+        run: |
+          $zip = "dist/PakeGUIWin-win-x64.zip"
+          Compress-Archive -Path dist/win-x64/PakeGUIWin.exe -DestinationPath $zip -Force
+
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  PakeGUIWin-win-x64.zip" | Set-Content dist/SHA256SUMS.txt -Encoding utf8
+
+          $size = [math]::Round((Get-Item $zip).Length / 1MB, 1)
+          Write-Host "ZIP: $zip ($size MB), SHA256 $hash"
+
+          @(
+            "### Pake GUI ${{ steps.version.outputs.version }}"
+            ""
+            "| Datei | Größe |"
+            "|---|---|"
+            "| PakeGUIWin-win-x64.zip | $size MB |"
+            ""
+            "SHA256: ``$hash``"
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Release veröffentlichen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Pake GUI für Windows ${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          # Pre-Release bei Vorab-Versionen (2.0.0-beta.1) oder wenn manuell angehakt.
+          prerelease: ${{ inputs.prerelease || contains(steps.version.outputs.version, '-') }}
+          fail_on_unmatched_files: true
+          files: |
+            dist/PakeGUIWin-win-x64.zip
+            dist/SHA256SUMS.txt
+          body: |
+            **Pake GUI für Windows ${{ steps.version.outputs.version }}**
+
+            Native Oberfläche für die [Pake-CLI](https://github.com/tw93/Pake): alle Eingaben des
+            Workflows `pake-cli.yaml` plus sämtliche Pake-Optionen – lokal bauen oder den
+            Online-Workflow per GitHub CLI starten.
+
+            ### Download
+
+            | Datei | Inhalt |
+            |---|---|
+            | `PakeGUIWin-win-x64.zip` | `PakeGUIWin.exe`, self-contained (keine .NET-Installation nötig) |
+            | `SHA256SUMS.txt` | SHA256-Prüfsumme des ZIP |
+
+            ### Start
+
+            1. ZIP entpacken (die EXE nicht direkt aus dem Archiv starten).
+            2. `PakeGUIWin.exe` doppelklicken. Die Datei ist nicht signiert – Windows SmartScreen
+               gegebenenfalls über „Weitere Informationen“ → „Trotzdem ausführen“ bestätigen.
+            3. Vor dem ersten Build **Build → Umgebung prüfen** ausführen.
+               Benötigt werden Node.js ≥ 20.9, Rust ≥ 1.85, die Visual Studio Build Tools
+               (oder die Toolchain `gnu` im Tab *Build*) und die WebView2-Runtime.
+
+            Anleitung und Workflow-Zuordnung: siehe `README.md` im Repository.
+
+      - name: Build-Artefakte aufbewahren
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: PakeGUIWin-${{ steps.version.outputs.version }}
+          path: |
+            dist/PakeGUIWin-win-x64.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: ignore
+          retention-days: 14
