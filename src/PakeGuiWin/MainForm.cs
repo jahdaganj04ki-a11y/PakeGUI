@@ -43,6 +43,8 @@ internal sealed class MainForm : Form
     private readonly ToolStripStatusLabel _status = new();
     private readonly ToolStripProgressBar _progress = new();
 
+    private readonly SplitContainer _split;
+
     private RunKind _running = RunKind.None;
     private string _customRunner = string.Empty;
     private string _lastOutputDirectory = string.Empty;
@@ -74,25 +76,29 @@ internal sealed class MainForm : Form
         _cancelButton.Click += (_, _) => _runner.Cancel();
         _cancelButton.Enabled = false;
 
-        var split = new SplitContainer
+        AppLog.Info("MainForm wird aufgebaut.");
+
+        // Wichtig: Panel1MinSize/Panel2MinSize NICHT im Initialisierer setzen – der
+        // Container ist dort noch 150 px breit, und SplitContainer wirft dann
+        // "SplitterDistance must be between Panel1MinSize and Width - Panel2MinSize".
+        // Die Mindestbreiten werden erst in OnShown gesetzt (siehe ApplySplitLayout).
+        _split = new SplitContainer
         {
             Dock = DockStyle.Fill,
             Orientation = Orientation.Vertical,
             SplitterWidth = 6,
             BackColor = Theme.Surface,
-            Panel1MinSize = 520,
-            Panel2MinSize = 390,
         };
-        split.Panel1.BackColor = Theme.Surface;
-        split.Panel2.BackColor = Theme.Surface;
-        split.Panel1.Controls.Add(_settings);
-        split.Panel2.Controls.Add(BuildRightPanel());
+        _split.Panel1.BackColor = Theme.Surface;
+        _split.Panel2.BackColor = Theme.Surface;
+        _split.Panel1.Controls.Add(_settings);
+        _split.Panel2.Controls.Add(BuildRightPanel());
 
         var header = BuildHeader();
         var menu = BuildMenu();
         var statusStrip = BuildStatusStrip();
 
-        Controls.Add(split);
+        Controls.Add(_split);
         Controls.Add(header);
         Controls.Add(menu);
         Controls.Add(statusStrip);
@@ -106,23 +112,45 @@ internal sealed class MainForm : Form
         _outputBox.TextChanged += (_, _) => UpdatePreview();
         _runnerMode.SelectedIndexChanged += (_, _) => OnRunnerModeChanged();
 
-        Shown += (_, _) =>
-        {
-            try
-            {
-                split.SplitterDistance = 700;
-            }
-            catch (InvalidOperationException)
-            {
-                // Fenster zu schmal – Standardaufteilung beibehalten.
-            }
-        };
-
         LoadAutoSettings();
         UpdatePreview();
 
         KeyDown += OnGlobalKeyDown;
         FormClosing += OnFormClosing;
+
+        AppLog.Info("MainForm bereit.");
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        ApplySplitLayout();
+        AppLog.Info($"Fenster angezeigt: {Width}x{Height}, " +
+                    $"Aufteilung {_split.SplitterDistance}px (min {_split.Panel1MinSize}/{_split.Panel2MinSize}).");
+    }
+
+    /// <summary>
+    /// Setzt Mindestbreiten und Splitterposition erst, wenn der Container seine echte
+    /// Größe hat. Die Werte kommen aus <see cref="SplitLayout"/> und sind damit immer
+    /// zulässig, auch bei sehr schmalen Fenstern oder hoher DPI-Skalierung.
+    /// </summary>
+    private void ApplySplitLayout()
+    {
+        if (_split.Width <= 0)
+            return;
+
+        try
+        {
+            var layout = SplitLayout.Compute(_split.Width, _split.SplitterWidth);
+            _split.Panel1MinSize = layout.Panel1MinSize;
+            _split.Panel2MinSize = layout.Panel2MinSize;
+            _split.SplitterDistance = layout.SplitterDistance;
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Layout ist nur Kosmetik – protokollieren statt abstürzen.
+            AppLog.Error("Aufteilung konnte nicht gesetzt werden", ex);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -222,6 +250,9 @@ internal sealed class MainForm : Form
         workflow.DropDownItems.Add(Item("Workflow im Browser öffnen", () => OpenUrl(WorkflowUrl)));
 
         var help = new ToolStripMenuItem("&Hilfe");
+        help.DropDownItems.Add(Item("Logdatei öffnen", OpenLogFile));
+        help.DropDownItems.Add(Item("Logordner öffnen", OpenLogFolder));
+        help.DropDownItems.Add(new ToolStripSeparator());
         help.DropDownItems.Add(Item("Über Pake GUI", ShowAbout));
 
         menu.Items.AddRange([file, build, workflow, help]);
@@ -631,6 +662,9 @@ internal sealed class MainForm : Form
 
         if (errors.Count > 0)
         {
+            AppLog.Warn("Build abgebrochen, Eingaben unvollständig: " +
+                        string.Join(" | ", errors.Select(e => e.Field + ": " + e.Message)));
+
             MessageBox.Show(
                 this,
                 "Bitte zuerst korrigieren:" + Environment.NewLine + Environment.NewLine +
@@ -659,6 +693,7 @@ internal sealed class MainForm : Form
         AppendLog("=== Build gestartet ===", Theme.HeaderAccent);
         AppendLog("Befehl: " + command.Display);
         AppendLog("Ausgabeordner: " + settings.OutputDirectory);
+        AppLog.Info($"Build gestartet (Aufruf: {settings.RunnerMode}, Plattform: {settings.Platform}, Zielformat: {settings.Targets})");
 
         foreach (var warning in command.Warnings)
             AppendLog("Hinweis: " + warning, Theme.Warning);
@@ -820,6 +855,8 @@ internal sealed class MainForm : Form
 
     private void OnRunnerCompleted(object? sender, int exitCode)
     {
+        AppLog.Info($"Lauf beendet ({_running}), Exitcode {exitCode}.");
+
         if (IsDisposed)
             return;
 
@@ -977,6 +1014,10 @@ internal sealed class MainForm : Form
         if (_log.TextLength > 400_000)
             _log.Clear();
 
+        // Alles, was im Protokoll steht, landet auch in der Logdatei neben der EXE.
+        if (message.Length > 0)
+            AppLog.Info("UI: " + message);
+
         _log.SelectionStart = _log.TextLength;
         _log.SelectionColor = color ?? Theme.LogText;
         _log.AppendText(message.Length == 0
@@ -984,6 +1025,41 @@ internal sealed class MainForm : Form
             : $"{DateTime.Now:HH:mm:ss}  {message}{Environment.NewLine}");
         _log.SelectionStart = _log.TextLength;
         _log.ScrollToCaret();
+    }
+
+    // ------------------------------------------------------------------
+    // Logdatei
+    // ------------------------------------------------------------------
+
+    private void OpenLogFile()
+    {
+        try
+        {
+            AppLog.Info("Logdatei auf Wunsch geöffnet.");
+            Process.Start(new ProcessStartInfo(AppLog.LogFilePath) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Logdatei konnte nicht geöffnet werden", ex);
+            MessageBox.Show(this,
+                "Logdatei konnte nicht geöffnet werden:" + Environment.NewLine + ex.Message +
+                Environment.NewLine + Environment.NewLine + AppLog.LogFilePath,
+                "Logdatei", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private void OpenLogFolder()
+    {
+        try
+        {
+            var folder = Path.GetDirectoryName(AppLog.LogFilePath);
+            if (!string.IsNullOrEmpty(folder))
+                Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Logordner konnte nicht geöffnet werden", ex);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1113,9 +1189,11 @@ internal sealed class MainForm : Form
         {
             File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(CollectAll(), ProfileJson));
             _status.Text = "Profil gespeichert: " + dialog.FileName;
+            AppLog.Info("Profil gespeichert: " + dialog.FileName);
         }
         catch (Exception ex)
         {
+            AppLog.Error("Profil konnte nicht gespeichert werden: " + dialog.FileName, ex);
             MessageBox.Show(this, "Profil konnte nicht gespeichert werden:" + Environment.NewLine + ex.Message,
                 "Profil speichern", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
@@ -1143,6 +1221,7 @@ internal sealed class MainForm : Form
 
             ApplySettings(settings);
             _status.Text = "Profil geladen: " + dialog.FileName;
+            AppLog.Info("Profil geladen: " + dialog.FileName);
         }
         catch (Exception ex)
         {
@@ -1241,6 +1320,7 @@ internal sealed class MainForm : Form
             _runner.Cancel();
         }
 
+        AppLog.Info("Fenster wird geschlossen.");
         SaveAutoSettings();
         _runner.Dispose();
     }

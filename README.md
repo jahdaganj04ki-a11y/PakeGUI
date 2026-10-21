@@ -16,7 +16,7 @@ zusätzlich per GitHub CLI (gh) in der Cloud starten.
 | **Fertige EXE** | `dist/win-x64/PakeGUIWin.exe` (49 MB, self-contained – keine .NET-Installation nötig) |
 | **ZIP** | `dist/PakeGUIWin-win-x64.zip` |
 | **Zielsystem** | Windows 10/11, x64 (Windows 11 ARM läuft über x64-Emulation) |
-| **Quellcode** | `src/PakeGui.Core` (Logik), `src/PakeGuiWin` (GUI), `tests/` (46 Tests) |
+| **Quellcode** | `src/PakeGui.Core` (Logik), `src/PakeGuiWin` (GUI), `tests/` (63 Tests) |
 
 ---
 
@@ -127,9 +127,24 @@ genau wie im Original-Workflow.
   Beim Beenden wird automatisch unter `%APPDATA%\PakeGUIWin\settings.json` gesichert.
 * **Pake-Aufruf**: *Automatisch* nutzt ein global installiertes `pake`, sonst `npx --yes pake-cli@latest`;
   *Eigener Befehl* erlaubt z. B. `pnpm pake` oder einen festen Pfad.
+* **Logdatei**: `PakeGUIWin.log` liegt neben der EXE; **Hilfe → Logdatei öffnen** zeigt sie an.
+  Dort landen Programmstart, Fenster-/Layoutdaten, jede Protokollzeile, Build-Aufrufe mit Exitcode
+  und alle Fehler inklusive Aufrufliste.
 * **Ausgabeordner öffnen** zeigt die fertigen Pakete im Explorer.
 
 Tastenkürzel: `F5` Build starten · `Strg+Shift+C` Befehl kopieren · `Strg+S` Profil speichern · `Strg+O` Profil laden.
+
+### Logdatei im Detail
+
+| | |
+|---|---|
+| Standard | `<Ordner der EXE>\PakeGUIWin.log` |
+| Rotation | ab 5 MB nach `PakeGUIWin.1.log` |
+| Fallback | `%LOCALAPPDATA%\PakeGUIWin\PakeGUIWin.log`, falls der Programmordner nicht beschreibbar ist (z. B. unter `C:\Program Files`) |
+| Aufruf | hilft bei Startproblemen: **Hilfe → Logdatei öffnen** bzw. **Logordner öffnen** |
+
+Zeilenformat: `2026-10-21 00:31:44.512 [INFO ] [T01] Meldung`. Bei einem Absturz nennt der
+Fehlerdialog direkt den Pfad der Logdatei – diese Datei genügt zur Analyse.
 
 ---
 
@@ -170,7 +185,7 @@ src/PakeGuiWin/            WinForms-Oberfläche
   MainForm.cs              Rahmen, Befehl, Protokoll, Build-Steuerung, gh
   SettingsPanel.cs         5 Tabs mit allen Optionen
   BuildRunner.cs           Prozessstart (cmd/sh) mit Streaming und Abbruch
-tests/PakeGui.Core.Tests/  46 xUnit-Tests
+tests/PakeGui.Core.Tests/  63 xUnit-Tests
 tools/make-icon.py         erzeugt assets/app.ico
 ```
 
@@ -196,7 +211,7 @@ Der Tag `v1.2.0` wird dabei automatisch am aktuellen Commit angelegt.
 
 Der Workflow erledigt:
 
-1. .NET 10 SDK einrichten, **46 Tests** ausführen (bricht bei Fehlern ab).
+1. .NET 10 SDK einrichten, **63 Tests** ausführen (bricht bei Fehlern ab).
 2. Version aus Tag bzw. Eingabe ableiten, als `Version`/`FileVersion` in die EXE schreiben.
 3. `PakeGUIWin.exe` self-contained für `win-x64` bauen.
 4. `PakeGUIWin-win-x64.zip` und `SHA256SUMS.txt` erzeugen (ZIP enthält die EXE direkt im Wurzelverzeichnis).
@@ -216,7 +231,7 @@ Der Dateiname bleibt stabil (`PakeGUIWin-win-x64.zip`), damit
 
 Automatisiert geprüft (in dieser Umgebung ausgeführt):
 
-* **46 Unit-Tests**: Standardwerte, jede Workflow-Eingabe → richtige CLI-Option,
+* **63 Unit-Tests**: Standardwerte, jede Workflow-Eingabe → richtige CLI-Option, Splitter-Geometrie,
   Plattform-/Zielformat-Prüfung, alle Zusatzoptionen, Quoting, Skripterzeugung,
   Validierung, Dispatch-JSON und gh-Befehl.
 * **CLI-Akzeptanztest gegen `pake-cli@latest`**: die erzeugte Argumentliste wurde dem
@@ -237,7 +252,26 @@ Windows-Rechner gegengeprüft werden; die Logik dahinter ist durch die Tests abg
 
 ---
 
-## 9. Rechtliches
+## 9. Änderungen
+
+### 1.0.1
+
+* **Behoben:** Absturz beim Start (`SplitterDistance must be between Panel1MinSize and
+  Width - Panel2MinSize`). Die Mindestbreiten des `SplitContainer` wurden gesetzt, solange
+  das Steuerelement noch 150 px breit war. Sie werden jetzt erst nach dem Anzeigen des
+  Fensters berechnet – über `SplitLayout.Compute`, das die Werte auf die tatsächliche
+  Breite begrenzt (auch bei hoher DPI-Skalierung und schmalen Fenstern).
+* **Neu:** Logdatei `PakeGUIWin.log` neben der EXE (Rotation, Fallback auf `%LOCALAPPDATA%`),
+  Menü **Hilfe → Logdatei öffnen / Logordner öffnen**, Fehlerdialog nennt den Logpfad.
+
+### 1.0.0
+
+* Erste Fassung: alle Workflow-Eingaben, sämtliche Pake-Optionen, lokaler Build mit Protokoll,
+  gh-Dispatch des Online-Workflows, Release-Workflow.
+
+---
+
+## 10. Rechtliches
 
 Dieses Programm ist eine inoffizielle Oberfläche und kein Bestandteil von Pake.
 [Pake](https://github.com/tw93/Pake) steht unter **GPL-3.0**; mit Pake erzeugte Apps
