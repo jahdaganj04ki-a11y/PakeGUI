@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <AssemblyName>PakeGUIWin</AssemblyName>
+    <RootNamespace>PakeGui.Win</RootNamespace>
+    <ApplicationIcon>assets/app.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationDefaultFont>Segoe UI, 9pt</ApplicationDefaultFont>
+
+    <Product>Pake GUI</Product>
+    <AssemblyTitle>Pake GUI fuer Windows</AssemblyTitle>
+    <Description>Alle Einstellungen des Pake-GitHub-Workflows als native Windows-Oberflaeche.</Description>
+    <Company>Pake GUI</Company>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Copyright>GUI fuer die Pake-CLI (GPL-3.0)</Copyright>
+
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <AllowedReferenceRelatedFileExtensions></AllowedReferenceRelatedFileExtensions>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../PakeGui.Core/PakeGui.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Die EXE enthaelt alles; Debug-Symbole der referenzierten Projekte nicht mitliefern. -->
+  <Target Name="RemoveReferencePdbs" AfterTargets="Publish">
+    <ItemGroup>
+      <ReferencePdbs Include="$(PublishDir)*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(ReferencePdbs)" />
+  </Target>
+
+</Project>
