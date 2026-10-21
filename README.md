@@ -16,7 +16,7 @@ zusätzlich per GitHub CLI (gh) in der Cloud starten.
 | **Fertige EXE** | `dist/win-x64/PakeGUIWin.exe` (49 MB, self-contained – keine .NET-Installation nötig) |
 | **ZIP** | `dist/PakeGUIWin-win-x64.zip` |
 | **Zielsystem** | Windows 10/11, x64 (Windows 11 ARM läuft über x64-Emulation) |
-| **Quellcode** | `src/PakeGui.Core` (Logik), `src/PakeGuiWin` (GUI), `tests/` (63 Tests) |
+| **Quellcode** | `src/PakeGui.Core` (Logik), `src/PakeGuiWin` (GUI), `tests/` (69 Tests) |
 
 ---
 
@@ -185,7 +185,7 @@ src/PakeGuiWin/            WinForms-Oberfläche
   MainForm.cs              Rahmen, Befehl, Protokoll, Build-Steuerung, gh
   SettingsPanel.cs         5 Tabs mit allen Optionen
   BuildRunner.cs           Prozessstart (cmd/sh) mit Streaming und Abbruch
-tests/PakeGui.Core.Tests/  63 xUnit-Tests
+tests/PakeGui.Core.Tests/  69 xUnit-Tests
 tools/make-icon.py         erzeugt assets/app.ico
 ```
 
@@ -211,7 +211,7 @@ Der Tag `v1.2.0` wird dabei automatisch am aktuellen Commit angelegt.
 
 Der Workflow erledigt:
 
-1. .NET 10 SDK einrichten, **63 Tests** ausführen (bricht bei Fehlern ab).
+1. .NET 10 SDK einrichten, **69 Tests** ausführen (bricht bei Fehlern ab).
 2. Version aus Tag bzw. Eingabe ableiten, als `Version`/`FileVersion` in die EXE schreiben.
 3. `PakeGUIWin.exe` self-contained für `win-x64` bauen.
 4. `PakeGUIWin-win-x64.zip` und `SHA256SUMS.txt` erzeugen (ZIP enthält die EXE direkt im Wurzelverzeichnis).
@@ -231,7 +231,8 @@ Der Dateiname bleibt stabil (`PakeGUIWin-win-x64.zip`), damit
 
 Automatisiert geprüft (in dieser Umgebung ausgeführt):
 
-* **63 Unit-Tests**: Standardwerte, jede Workflow-Eingabe → richtige CLI-Option, Splitter-Geometrie,
+* **69 Unit-Tests**: Standardwerte, jede Workflow-Eingabe → richtige CLI-Option, Splitter-Geometrie,
+  Log-Schreiben/Rotation/Fallback,
   Plattform-/Zielformat-Prüfung, alle Zusatzoptionen, Quoting, Skripterzeugung,
   Validierung, Dispatch-JSON und gh-Befehl.
 * **CLI-Akzeptanztest gegen `pake-cli@latest`**: die erzeugte Argumentliste wurde dem
@@ -253,6 +254,13 @@ Windows-Rechner gegengeprüft werden; die Logik dahinter ist durch die Tests abg
 ---
 
 ## 9. Änderungen
+
+### 1.0.2
+
+* Log-Schreiblogik nach `src/PakeGui.Core/AppLogFile.cs` ausgelagert und mit Tests abgesichert:
+  Fallback, wenn der Programmordner nicht beschreibbar ist, Rotation ab 5 MB, Schreiben aus
+  mehreren Threads, Fehlerzeilen mit Aufrufliste – und die Zusicherung, dass das Logging
+  selbst nie eine Ausnahme auslöst (auch nicht beim Start).
 
 ### 1.0.1
 
