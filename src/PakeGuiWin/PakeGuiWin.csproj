@@ -19,8 +19,8 @@
     <AssemblyTitle>Pake GUI fuer Windows</AssemblyTitle>
     <Description>Alle Einstellungen des Pake-GitHub-Workflows als native Windows-Oberflaeche.</Description>
     <Company>Pake GUI</Company>
-    <Version>1.0.2</Version>
-    <FileVersion>1.0.2.0</FileVersion>
+    <Version>1.0.3</Version>
+    <FileVersion>1.0.3.0</FileVersion>
     <Copyright>GUI fuer die Pake-CLI (GPL-3.0)</Copyright>
 
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

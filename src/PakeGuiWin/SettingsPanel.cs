@@ -9,7 +9,9 @@ namespace PakeGui.Win;
 /// </summary>
 internal sealed class SettingsPanel : UserControl
 {
-    private readonly TabControl _tabs = new();
+    private readonly DarkTabStrip _tabStrip = new();
+    private readonly Panel _content = new();
+    private readonly List<Panel> _pages = [];
     private readonly List<Action<PakeSettings>> _apply = [];
     private readonly List<Action<PakeSettings>> _load = [];
 
@@ -28,12 +30,16 @@ internal sealed class SettingsPanel : UserControl
         BackColor = Theme.Surface;
         Padding = new Padding(0);
 
-        _tabs.Dock = DockStyle.Fill;
-        _tabs.Font = Theme.Body;
-        _tabs.Padding = new Point(16, 6);
-        Controls.Add(_tabs);
+        _content.Dock = DockStyle.Fill;
+        _content.BackColor = Theme.Surface;
+
+        Controls.Add(_content);
+        Controls.Add(_tabStrip);
 
         BuildTabs();
+        _tabStrip.SelectedIndexChanged += (_, _) => ShowPage(_tabStrip.SelectedIndex);
+        ShowPage(0);
+
         Apply(new PakeSettings());
     }
 
@@ -83,17 +89,41 @@ internal sealed class SettingsPanel : UserControl
 
     private void BuildTabs()
     {
-        _tabs.TabPages.Add(BuildWorkflowTab());
-        _tabs.TabPages.Add(BuildWindowTab());
-        _tabs.TabPages.Add(BuildFeaturesTab());
-        _tabs.TabPages.Add(BuildNetworkTab());
-        _tabs.TabPages.Add(BuildBuildTab());
+        var pages = new (string Title, Panel Page)[]
+        {
+            ("Workflow", BuildWorkflowTab()),
+            ("Fenster", BuildWindowTab()),
+            ("Funktionen", BuildFeaturesTab()),
+            ("Netzwerk", BuildNetworkTab()),
+            ("Build", BuildBuildTab()),
+        };
+
+        foreach (var (_, page) in pages)
+        {
+            page.Visible = false;
+            _pages.Add(page);
+            _content.Controls.Add(page);
+        }
+
+        _tabStrip.SetTitles(pages.Select(p => p.Title).ToList());
     }
 
-    private static (TabPage Page, TableLayoutPanel Table) CreatePage(string title, string intro)
+    private void ShowPage(int index)
     {
-        var page = new TabPage(title)
+        if (index < 0 || index >= _pages.Count)
+            return;
+
+        for (var i = 0; i < _pages.Count; i++)
+            _pages[i].Visible = i == index;
+
+        _pages[index].BringToFront();
+    }
+
+    private static (Panel Page, TableLayoutPanel Table) CreatePage(string intro)
+    {
+        var page = new Panel
         {
+            Dock = DockStyle.Fill,
             BackColor = Theme.Surface,
             AutoScroll = true,
             Padding = new Padding(12, 10, 8, 10),
@@ -134,10 +164,9 @@ internal sealed class SettingsPanel : UserControl
         return (page, table);
     }
 
-    private TabPage BuildWorkflowTab()
+    private Panel BuildWorkflowTab()
     {
         var (page, t) = CreatePage(
-            "Workflow",
             "Diese Seite entspricht genau den Eingaben des GitHub-Workflows \u201eBuild App With Pake CLI\u201c " +
             "(pake-cli.yaml). Jede Einstellung wird beim Start als passende Pake-CLI-Option uebergeben.");
 
@@ -185,9 +214,9 @@ internal sealed class SettingsPanel : UserControl
         return page;
     }
 
-    private TabPage BuildWindowTab()
+    private Panel BuildWindowTab()
     {
-        var (page, t) = CreatePage("Fenster", "Darstellung und Verhalten des spaeteren Programmfensters.");
+        var (page, t) = CreatePage("Darstellung und Verhalten des spaeteren Programmfensters.");
 
         AddSection(t, "Fenster");
 
@@ -219,9 +248,9 @@ internal sealed class SettingsPanel : UserControl
         return page;
     }
 
-    private TabPage BuildFeaturesTab()
+    private Panel BuildFeaturesTab()
     {
-        var (page, t) = CreatePage("Funktionen", "System-Tray, mehrere Fenster und Web-Funktionen.");
+        var (page, t) = CreatePage("System-Tray, mehrere Fenster und Web-Funktionen.");
 
         AddSection(t, "System-Tray");
 
@@ -241,9 +270,9 @@ internal sealed class SettingsPanel : UserControl
         return page;
     }
 
-    private TabPage BuildNetworkTab()
+    private Panel BuildNetworkTab()
     {
-        var (page, t) = CreatePage("Netzwerk", "Proxy, User-Agent, Navigation und eingebettete Dateien.");
+        var (page, t) = CreatePage("Proxy, User-Agent, Navigation und eingebettete Dateien.");
 
         AddSection(t, "Netzwerk");
 
@@ -277,9 +306,9 @@ internal sealed class SettingsPanel : UserControl
         return page;
     }
 
-    private TabPage BuildBuildTab()
+    private Panel BuildBuildTab()
     {
-        var (page, t) = CreatePage("Build", "Artefakte und Details des lokalen Builds.");
+        var (page, t) = CreatePage("Artefakte und Details des lokalen Builds.");
 
         AddSection(t, "Windows-Build");
 
@@ -406,10 +435,10 @@ internal sealed class SettingsPanel : UserControl
         var box = new TextBox
         {
             Font = Theme.Body,
-            BorderStyle = BorderStyle.FixedSingle,
             Dock = DockStyle.Fill,
             Margin = new Padding(0, 4, 8, 4),
         };
+        Theme.StyleTextBox(box);
         box.TextChanged += (_, _) => RaiseChanged();
 
         if (browse is null)
@@ -472,6 +501,7 @@ internal sealed class SettingsPanel : UserControl
             Margin = new Padding(0, 4, 8, 4),
             TextAlign = HorizontalAlignment.Right,
         };
+        Theme.StyleSpin(spin);
         spin.ValueChanged += (_, _) => RaiseChanged();
 
         table.Controls.Add(spin, 1, row);
@@ -501,10 +531,10 @@ internal sealed class SettingsPanel : UserControl
             Text = label,
             AutoSize = true,
             Font = Theme.Body,
-            ForeColor = Theme.Text,
             Anchor = AnchorStyles.Left,
             Margin = new Padding(0, 6, 8, 4),
         };
+        Theme.StyleCheck(check);
         check.CheckedChanged += (_, _) => RaiseChanged();
 
         table.Controls.Add(check, 0, row);
@@ -537,6 +567,7 @@ internal sealed class SettingsPanel : UserControl
             Margin = new Padding(0, 4, 8, 4),
             DropDownStyle = editable ? ComboBoxStyle.DropDown : ComboBoxStyle.DropDownList,
         };
+        Theme.StyleCombo(combo);
         if (items is not null)
             combo.Items.AddRange(items);
         combo.TextChanged += (_, _) => RaiseChanged();
@@ -648,6 +679,7 @@ internal sealed class SettingsPanel : UserControl
     private void BrowseUrlOrPath(TextBox box)
     {
         var menu = new ContextMenuStrip();
+        Theme.StyleContextMenu(menu);
         menu.Items.Add("Web-Adresse eingeben", null, (_, _) => box.Focus());
         menu.Items.Add("Lokale HTML-Datei waehlen...", null, (_, _) =>
             BrowseFile(box, "HTML-Datei auswaehlen", "Webseiten|*.html;*.htm|Alle Dateien|*.*"));

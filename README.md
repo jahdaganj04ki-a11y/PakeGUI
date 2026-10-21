@@ -16,7 +16,7 @@ zusätzlich per GitHub CLI (gh) in der Cloud starten.
 | **Fertige EXE** | `dist/win-x64/PakeGUIWin.exe` (49 MB, self-contained – keine .NET-Installation nötig) |
 | **ZIP** | `dist/PakeGUIWin-win-x64.zip` |
 | **Zielsystem** | Windows 10/11, x64 (Windows 11 ARM läuft über x64-Emulation) |
-| **Quellcode** | `src/PakeGui.Core` (Logik), `src/PakeGuiWin` (GUI), `tests/` (69 Tests) |
+| **Quellcode** | `src/PakeGui.Core` (Logik), `src/PakeGuiWin` (GUI), `tests/` (88 Tests) |
 
 ---
 
@@ -134,6 +134,37 @@ genau wie im Original-Workflow.
 
 Tastenkürzel: `F5` Build starten · `Strg+Shift+C` Befehl kopieren · `Strg+S` Profil speichern · `Strg+O` Profil laden.
 
+### Farbschema: GitHub Dark Default
+
+Die Oberfläche nutzt die Primer-Tokens des Codespace-Themes **„GitHub Dark Default“** (1:1 in
+[`Theme.cs`](src/PakeGuiWin/Theme.cs)); die Tabelle unten wird aus denselben Werten erzeugt
+(`python3 tools/make-theme-preview.py`).
+
+![Palette des GitHub-Dark-Default-Themes](docs/theme-palette.png)
+
+| Rolle im Programm | Token | Wert |
+|---|---|---|
+| Fensterhintergrund | `bgColor-default` | `#0d1117` |
+| Karten, Kopfzeile, Menü | `bgColor-muted` | `#151b23` |
+| Befehl-/Protokollfeld | `bgColor-inset` | `#010409` |
+| Text | `fgColor-default` | `#f0f6fc` |
+| Hinweise, Sekundärtext | `fgColor-muted` | `#9198a1` |
+| Links, aktive Reiter | `fgColor-accent` | `#4493f8` |
+| Primärbutton („Build starten“) | `button-primary-bgColor-rest` | `#238636` (Hover `#29903b`) |
+| Sekundärbuttons | `button-default-bgColor-rest` | `#212830` (Hover `#262c36`) |
+| Rahmen | `borderColor-default` | `#3d444d` |
+| Erfolg / Hinweis / Fehler | `fgColor-success/attention/danger` | `#3fb950` / `#d29922` / `#f85149` |
+| Aktiver Reiter (Unterstrich) | `underlineNav-borderColor-active` | `#f78166` |
+
+Kontrast (WCAG, berechnet): Text auf Hintergrund **17,4:1**, gedämpfter Text **6,5:1**,
+weiße Schrift auf dem Primärbutton **4,6:1** – alles über AA.
+
+WinForms kann Tabs, Menüs und Statusleisten nicht von sich aus dunkel zeichnen. Deshalb gibt es
+eine eigene Reiterleiste ([`DarkTabStrip.cs`](src/PakeGuiWin/DarkTabStrip.cs)) mit
+GitHub-Unterstrich und einen eigenen ToolStrip-Renderer
+([`DarkThemeRenderer.cs`](src/PakeGuiWin/DarkThemeRenderer.cs)). Systemgezeichnet bleiben nur
+Dinge, die Windows selbst rendert: Aufklapplisten, Checkbox-Kästchen, Spin-Buttons und Tooltips.
+
 ### Logdatei im Detail
 
 | | |
@@ -180,13 +211,21 @@ src/PakeGui.Core/          Logik ohne UI (plattformunabhängig, testbar)
   PakeArgumentBuilder.cs   Einstellungen -> pake-Argumente (+ Hinweise)
   PakeCommandLineBuilder.cs Aufruf, PATH-Suche, Build-Skript
   PakeValidation.cs        Feldprüfungen (Fehler/Warnungen)
+  SplitLayout.cs           Splitter-Geometrie (Startfehler-Klasse)
+  AppLogFile.cs            Logdatei: Rotation, Fallback, threadsicher
+  GitHubDarkPalette.cs     Farbtokens „GitHub Dark Default“ (getestet)
   WorkflowDispatch.cs      workflow_dispatch-JSON und gh-Befehl
 src/PakeGuiWin/            WinForms-Oberfläche
   MainForm.cs              Rahmen, Befehl, Protokoll, Build-Steuerung, gh
-  SettingsPanel.cs         5 Tabs mit allen Optionen
+  SettingsPanel.cs         Reiter mit allen Optionen
+  DarkTabStrip.cs          Reiterleiste im GitHub-Look (Unterstrich)
+  DarkThemeRenderer.cs     dunkle Menü-/Statusleiste
+  Theme.cs                 Palette + Steuerelement-Helfer
   BuildRunner.cs           Prozessstart (cmd/sh) mit Streaming und Abbruch
-tests/PakeGui.Core.Tests/  69 xUnit-Tests
+docs/theme-palette.png     Palettenübersicht mit Kontrastwerten
+tests/PakeGui.Core.Tests/  88 xUnit-Tests
 tools/make-icon.py         erzeugt assets/app.ico
+tools/make-theme-preview.py erzeugt docs/theme-palette.png aus Theme.cs
 ```
 
 ---
@@ -211,7 +250,7 @@ Der Tag `v1.2.0` wird dabei automatisch am aktuellen Commit angelegt.
 
 Der Workflow erledigt:
 
-1. .NET 10 SDK einrichten, **69 Tests** ausführen (bricht bei Fehlern ab).
+1. .NET 10 SDK einrichten, **88 Tests** ausführen (bricht bei Fehlern ab).
 2. Version aus Tag bzw. Eingabe ableiten, als `Version`/`FileVersion` in die EXE schreiben.
 3. `PakeGUIWin.exe` self-contained für `win-x64` bauen.
 4. `PakeGUIWin-win-x64.zip` und `SHA256SUMS.txt` erzeugen (ZIP enthält die EXE direkt im Wurzelverzeichnis).
@@ -231,8 +270,8 @@ Der Dateiname bleibt stabil (`PakeGUIWin-win-x64.zip`), damit
 
 Automatisiert geprüft (in dieser Umgebung ausgeführt):
 
-* **69 Unit-Tests**: Standardwerte, jede Workflow-Eingabe → richtige CLI-Option, Splitter-Geometrie,
-  Log-Schreiben/Rotation/Fallback,
+* **88 Unit-Tests**: Standardwerte, jede Workflow-Eingabe → richtige CLI-Option, Splitter-Geometrie,
+  Log-Schreiben/Rotation/Fallback, Farbtokens und Kontrastwerte des GitHub-Dark-Themes,
   Plattform-/Zielformat-Prüfung, alle Zusatzoptionen, Quoting, Skripterzeugung,
   Validierung, Dispatch-JSON und gh-Befehl.
 * **CLI-Akzeptanztest gegen `pake-cli@latest`**: die erzeugte Argumentliste wurde dem
@@ -254,6 +293,15 @@ Windows-Rechner gegengeprüft werden; die Logik dahinter ist durch die Tests abg
 ---
 
 ## 9. Änderungen
+
+### 1.0.3
+
+* Neues Farbschema nach dem GitHub-Codespace-Theme **„GitHub Dark Default“** (Primer-Tokens).
+  Dafür eigene Reiterleiste mit Unterstrich-Indikator (`#f78166`), eigener ToolStrip-Renderer für
+  Menü und Statusleiste sowie dunkle Eingabefelder, Karten und Protokollflächen.
+* `docs/theme-palette.png` dokumentiert die verwendeten Tokens samt Kontrastwerten;
+  `GitHubDarkPalette` hält die Hex-Werte fest (inkl. Kontrasttests), damit das Theme nicht
+  unbemerkt abweicht.
 
 ### 1.0.2
 

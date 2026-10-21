@@ -87,7 +87,7 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Fill,
             Orientation = Orientation.Vertical,
             SplitterWidth = 6,
-            BackColor = Theme.Surface,
+            BackColor = Theme.BorderDefault,
         };
         _split.Panel1.BackColor = Theme.Surface;
         _split.Panel2.BackColor = Theme.Surface;
@@ -171,7 +171,7 @@ internal sealed class MainForm : Form
         {
             Text = "Pake GUI",
             Font = Theme.Title,
-            ForeColor = Color.White,
+            ForeColor = Theme.FgDefault,
             AutoSize = true,
             Location = new Point(20, 10),
         };
@@ -180,7 +180,7 @@ internal sealed class MainForm : Form
         {
             Text = "Alle Einstellungen des GitHub-Workflows \u201eBuild App With Pake CLI\u201c \u2013 lokal als Windows-App bauen",
             Font = Theme.Subtitle,
-            ForeColor = Theme.HeaderAccent,
+            ForeColor = Theme.HeaderSubtitle,
             AutoSize = true,
             Location = new Point(22, 39),
         };
@@ -189,8 +189,8 @@ internal sealed class MainForm : Form
         {
             Text = "Pake auf GitHub",
             Font = Theme.Small,
-            LinkColor = Theme.HeaderAccent,
-            ActiveLinkColor = Color.White,
+            LinkColor = Theme.Link,
+            ActiveLinkColor = Theme.FgDefault,
             AutoSize = true,
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
         };
@@ -201,6 +201,14 @@ internal sealed class MainForm : Form
         header.Controls.Add(subtitle);
         header.Controls.Add(link);
         header.Resize += (_, _) => link.Location = new Point(header.Width - link.Width - 22, 30);
+
+        // Feine Trennlinie wie in GitHub-Headern.
+        header.Paint += (_, e) =>
+        {
+            using var pen = new Pen(Theme.BorderDefault);
+            e.Graphics.DrawLine(pen, 0, header.Height - 1, header.Width, header.Height - 1);
+        };
+
         return header;
     }
 
@@ -209,6 +217,8 @@ internal sealed class MainForm : Form
         var menu = new MenuStrip
         {
             BackColor = Theme.Card,
+            ForeColor = Theme.FgDefault,
+            Renderer = new DarkToolStripRenderer(),
             Padding = new Padding(6, 2, 0, 2),
         };
 
@@ -264,6 +274,8 @@ internal sealed class MainForm : Form
         var strip = new StatusStrip
         {
             BackColor = Theme.Card,
+            ForeColor = Theme.FgMuted,
+            Renderer = new DarkToolStripRenderer(),
             SizingGrip = false,
             Font = Theme.Small,
         };
@@ -341,6 +353,7 @@ internal sealed class MainForm : Form
             Font = Theme.BodyBold,
             ForeColor = Theme.Text,
             BackColor = Theme.Card,
+            FlatStyle = FlatStyle.Flat,
             Padding = new Padding(10, 4, 10, 8),
             Margin = new Padding(0, 0, 0, 8),
         };
@@ -358,11 +371,12 @@ internal sealed class MainForm : Form
         table.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
 
         _outputBox.Font = Theme.Body;
-        _outputBox.BorderStyle = BorderStyle.FixedSingle;
+        Theme.StyleTextBox(_outputBox, inset: true);
         _outputBox.Margin = new Padding(0);
         var outputHost = WithButton(_outputBox, "Ordner wählen", BrowseOutputFolder);
 
         _runnerMode.Font = Theme.Body;
+        Theme.StyleCombo(_runnerMode);
         _runnerMode.DropDownStyle = ComboBoxStyle.DropDownList;
         _runnerMode.Items.AddRange(
         [
@@ -394,6 +408,7 @@ internal sealed class MainForm : Form
             Font = Theme.BodyBold,
             ForeColor = Theme.Text,
             BackColor = Theme.Card,
+            FlatStyle = FlatStyle.Flat,
             Padding = new Padding(10, 4, 10, 8),
             Margin = new Padding(0, 0, 0, 6),
         };
@@ -402,9 +417,7 @@ internal sealed class MainForm : Form
         _commandBox.ReadOnly = true;
         _commandBox.Dock = DockStyle.Fill;
         _commandBox.Font = Theme.Mono;
-        _commandBox.BorderStyle = BorderStyle.FixedSingle;
-        _commandBox.BackColor = Color.FromArgb(248, 250, 252);
-        _commandBox.ForeColor = Theme.Text;
+        Theme.StyleTextBox(_commandBox, inset: true);
         _commandBox.ScrollBars = ScrollBars.Vertical;
         _commandBox.WordWrap = false;
 
@@ -448,12 +461,14 @@ internal sealed class MainForm : Form
                 AutoSize = true,
                 Height = 26,
                 FlatStyle = FlatStyle.Flat,
-                BackColor = Theme.Card,
-                ForeColor = Theme.Text,
+                BackColor = Theme.BtnDefault,
+                ForeColor = Theme.FgDefault,
                 Font = Theme.Small,
+                Cursor = Cursors.Hand,
                 Margin = new Padding(4, 0, 0, 0),
             };
-            button.FlatAppearance.BorderColor = Theme.Border;
+            button.FlatAppearance.BorderColor = Theme.BorderDefault;
+            button.FlatAppearance.MouseOverBackColor = Theme.BtnDefaultHover;
             button.Click += (_, _) => action();
             actions.Controls.Add(button);
         }
@@ -690,7 +705,7 @@ internal sealed class MainForm : Form
         _lastOutputDirectory = settings.OutputDirectory;
 
         AppendLog(string.Empty);
-        AppendLog("=== Build gestartet ===", Theme.HeaderAccent);
+        AppendLog("=== Build gestartet ===", Theme.Accent);
         AppendLog("Befehl: " + command.Display);
         AppendLog("Ausgabeordner: " + settings.OutputDirectory);
         AppLog.Info($"Build gestartet (Aufruf: {settings.RunnerMode}, Plattform: {settings.Platform}, Zielformat: {settings.Targets})");
@@ -722,7 +737,7 @@ internal sealed class MainForm : Form
 
         var script = OperatingSystem.IsWindows() ? WindowsEnvironmentScript : PosixEnvironmentScript;
         AppendLog(string.Empty);
-        AppendLog("=== Umgebung prüfen ===", Theme.HeaderAccent);
+        AppendLog("=== Umgebung prüfen ===", Theme.Accent);
         SetRunning(RunKind.Environment);
 
         try
@@ -758,7 +773,7 @@ internal sealed class MainForm : Form
             : "#!/bin/sh\nnpm install -g pake-cli\n";
 
         AppendLog(string.Empty);
-        AppendLog("=== Pake-CLI installieren ===", Theme.HeaderAccent);
+        AppendLog("=== Pake-CLI installieren ===", Theme.Accent);
         SetRunning(RunKind.Install);
 
         try
@@ -813,7 +828,7 @@ internal sealed class MainForm : Form
             : "#!/bin/sh\ncommand -v gh >/dev/null || { echo 'gh CLI nicht gefunden'; exit 1; }\n" + gh + "\n";
 
         AppendLog(string.Empty);
-        AppendLog("=== GitHub-Workflow wird gestartet ===", Theme.HeaderAccent);
+        AppendLog("=== GitHub-Workflow wird gestartet ===", Theme.Accent);
         AppendLog(gh);
         SetRunning(RunKind.Workflow);
 
@@ -837,7 +852,7 @@ internal sealed class MainForm : Form
                       $"--workflow {WorkflowDispatch.WorkflowFile} --limit 5";
 
         AppendLog(string.Empty);
-        AppendLog("=== Letzte Workflow-Läufe ===", Theme.HeaderAccent);
+        AppendLog("=== Letzte Workflow-Läufe ===", Theme.Accent);
         SetRunning(RunKind.Workflow);
 
         try
