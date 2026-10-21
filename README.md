@@ -1,6 +1,7 @@
 # Pake GUI für Windows
 
-[![Release](https://github.com/jahdaganj04ki-a11y/PakeGUIWin/actions/workflows/release.yml/badge.svg)](https://github.com/jahdaganj04ki-a11y/PakeGUIWin/releases/latest)
+[![Release](https://github.com/jahdaganj04ki-a11y/PakeGUI/actions/workflows/release.yml/badge.svg)](https://github.com/jahdaganj04ki-a11y/PakeGUI/releases/latest)
+[![Letztes Release](https://img.shields.io/github/v/release/jahdaganj04ki-a11y/PakeGUI?label=Download)](https://github.com/jahdaganj04ki-a11y/PakeGUI/releases/latest)
 
 Native Windows-Oberfläche (C# / WinForms, .NET 10) für den Pake-Online-Workflow
 [`pake-cli.yaml`](https://github.com/jahdaganj04ki-a11y/PakeGUIWin/blob/main/.github/workflows/pake-cli.yaml)
@@ -177,8 +178,10 @@ tools/make-icon.py         erzeugt assets/app.ico
 
 ## 7. Releases auf GitHub
 
-Die Builds landen automatisch in den [Releases](https://github.com/jahdaganj04ki-a11y/PakeGUIWin/releases) –
+Die Builds landen automatisch in den [Releases](https://github.com/jahdaganj04ki-a11y/PakeGUI/releases) –
 gesteuert von [`.github/workflows/release.yml`](.github/workflows/release.yml).
+Direkter Download der jeweils neuesten Version:
+`https://github.com/jahdaganj04ki-a11y/PakeGUI/releases/latest/download/PakeGUIWin-win-x64.zip`
 
 **Variante A – Tag pushen** (üblich):
 
